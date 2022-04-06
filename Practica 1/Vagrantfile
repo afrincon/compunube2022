@@ -16,7 +16,10 @@ Vagrant.configure("2") do |config|
     node1.vm.hostname = "manager.local.io"
     node1.vm.network "private_network", ip: "192.168.56.2"
     #node1.vm.network "forwarded_port", guest: 8888, host: 8888
+    node1.vm.synced_folder "src/", "/notebooks",
+        owner: "vagrant", group: "vagrant"
     node1.vm.provision "shell", path: "deployJupyter.sh"
+
   end
 
   config.vm.define "node2" do |node2|

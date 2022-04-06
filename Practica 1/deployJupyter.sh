@@ -15,6 +15,6 @@ echo "export vars"
 su --login -c "export PATH='$HOME/.local/bin:$PATH'" vagrant
 
 echo "run jupyter"
-su --login -c "nohup jupyter notebook --ip=0.0.0.0 &" vagrant
+su --login -c "nohup jupyter notebook --ip=0.0.0.0 --notebook-dir='/notebooks' &" vagrant
+echo "display"
 su --login -c "jupyter notebook list" vagrant
-su --login -c "cat /home/vagrant/.local/share/jupyter/runtime/notebook_cookie_secret" vagrant
