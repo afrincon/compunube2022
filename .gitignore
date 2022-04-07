@@ -1,4 +1,7 @@
 *.doc
 *.pdf
 *.log
+*.box
+*.zip
 .vagrant
+tensorflow/
