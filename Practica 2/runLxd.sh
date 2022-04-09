@@ -28,10 +28,9 @@ lxc exec server -- sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\Password
 
 echo "restarting sshd"
 lxc exec server -- systemctl restart sshd
-
 echo "adding new user"
-lxc exec server -- useradd remoto -p remoto
+lxc exec server -- useradd remoto -m -s /bin/bash -p remoto
 
 echo "port forwarding sshd"
-lxc config device add server sshport22 proxy listen=tcp:192.168.56.2:1022 connect=tcp:127.0.0.1:22
+lxc config device add server sshport22 proxy listen=tcp:192.168.56.2:2022 connect=tcp:127.0.0.1:22
 

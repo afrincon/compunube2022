@@ -16,7 +16,7 @@ Vagrant.configure("2") do |config|
     node1.vm.synced_folder "src/", "/containers",
         owner: "vagrant", group: "vagrant"
     node1.vm.provision "shell", path: "deployLxd.sh"
-    #node1.vm.provision "shell", path: "runLxd.sh", privileged: false
+    node1.vm.provision "shell", path: "runLxd.sh", privileged: false
   end
 
   config.vm.define "node2" do |node2|
