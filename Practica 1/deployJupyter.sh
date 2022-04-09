@@ -2,7 +2,7 @@
 
 echo "Installing pip"
 apt update
-apt install python3-pip net-tools vim -y 
+apt install python3-pip net-tools vim git -y 
 
 echo "updating pip"
 su --login -c "python3 -m pip install --upgrade pip" vagrant
