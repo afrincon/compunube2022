@@ -5,7 +5,7 @@ echo "lxd init #######"
 lxd init --auto
 echo "creating server ######"
 lxc launch -e ubuntu:20.04 server
-
+sleep 60
 echo "installing apache2 #######"
 lxc exec server -- apt install apache2 -y
 

@@ -5,3 +5,4 @@
 *.zip
 .vagrant
 tensorflow/
+.ipynb_checkpoints

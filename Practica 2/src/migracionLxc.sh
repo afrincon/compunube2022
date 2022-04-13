@@ -4,14 +4,13 @@ lxd init --auto
 lxc config set core.https_address 192.168.56.3:8443
 lxc config set core.trust_password compunube
 
-
 lxc remote add server2 192.168.56.3 
 sudo ufw allow from 192.168.56.2 to 192.168.56.3 port 8443
 
 lxc snapshot webserver
 lxc copy webserver/snap0 server1:webserver  --verbose
 lxc list server2:
-lxc start server1:webserver
+lxc start server2:webservers
 
 yes |lxc remote add server2 192.168.1.6
 
