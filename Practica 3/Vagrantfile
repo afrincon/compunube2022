@@ -1,31 +1,49 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+$install_puppet = <<-PUPPET
+sudo apt install update -y
+sudo apt install -y puppet
+PUPPET
+
 $install_ansible = <<-ANSIBLE
-sudo apt update -y
 sudo apt install software-properties-common -y
-sudo add-apt-repository --yes --update ppa:ansible/ansible
-sudo apt install -y ansible
-ansible-galaxy collection install community.general
+sudo add-apt-repository --yes --update ppa:ansible/ansible -y
+sudo apt install ansible -y
 ANSIBLE
 
+$install_galaxy = <<-GALAXY
+ansible-galaxy collection install community.general
+GALAXY
+
 Vagrant.configure("2") do |config|
+
   if Vagrant.has_plugin? "vagrant-vbguest"
     config.vbguest.no_install  = true
     config.vbguest.auto_update = false
     config.vbguest.no_remote   = true
   end
 
-  config.vm.define "node1" do |node1|
-    node1.vm.box = "bento/ubuntu-20.04"
-    node1.vm.hostname = "manager.local.io"
-    node1.vm.network "private_network", ip: "192.168.56.2"
-    #node1.vm.synced_folder "notebooks/", "/notebooks"
-    node1.vm.provision "shell", inline: $install_ansible
-    node1.vm.provision "ansible" do |ansible| 
-      ansible.playbook="containers-playbook.yml" 
+  config.vm.define "manager" do  |manager|
+    manager.vm.box = "bento/ubuntu-20.04"
+    manager.vm.hostname = "manager.local.io"
+    manager.vm.network "private_network", ip: "192.168.56.2"
+    manager.vm.synced_folder "ansible/notebooks", "/notebooks",
+      owner: "vagrant", group: "vagrant"
+    manager.vm.provision "shell", path: "script.sh"
+    manager.vm.provision "shell", inline: $install_puppet
+    manager.vm.provision "shell", inline: $install_ansible
+    manager.vm.provision "shell", inline: $install_galaxy, privileged: false
+
+    manager.vm.provision :puppet do |puppet|
+      puppet.manifests_path = "puppet/manifests"
+      puppet.manifest_file = "site.pp"
+      puppet.module_path = "puppet/modules"
     end
 
-
+    manager.vm.provision "ansible_local" do |ansible|
+      ansible.playbook = "ansible/master-playbook.yml"
+    end
   end
+
 end

@@ -1,0 +1,94 @@
+---
+- hosts: all
+  gather_facts: no
+
+  tasks:
+    - name: update cache
+      become: yes
+      become_user: root
+      apt:
+        update_cache: yes
+
+    - name: install pip
+      become: yes
+      become_user: root
+      apt: 
+        name: python3-pip
+        state: latest
+
+    - name: upgrade pip
+      pip: 
+        name: pip
+        executable: pip3
+        state: latest
+    
+    - name: install jupyter notebooks
+      pip:
+        name: notebook
+        executable: pip3
+        state: latest
+
+    - name: update version of markupsafe
+      pip:
+        name: markupsafe==2.0.1
+        executable: pip3
+        state: present
+      
+    - name: run jupyter notebooks
+      become: yes
+      become_user: vagrant
+      shell: "nohup /home/vagrant/.local/bin/jupyter notebook --no-browser --ip=0.0.0.0 --notebook-dir='/notebooks' &"
+      async: 10
+
+    - name: display run notebooks
+      become: yes
+      become_user: vagrant
+      command: "/home/vagrant/.local/bin/jupyter notebook list"
+      register: out
+
+    - name: init lxd
+      become: yes
+      become_user: vagrant
+      command: lxd init --auto
+
+    - name: create a container with lxd
+      become: yes
+      become_user: vagrant
+      community.general.lxd_container:
+        name: web1
+        ignore_volatile_options: true
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          protocol: simplestreams
+          alias: ubuntu/focal/amd64
+        profiles: ["default"]
+        wait_for_ipv4_addresses: true
+        timeout: 600
+    
+    - name: Get container IP
+      become: yes
+      become_user: vagrant
+      shell: lxc list web1 -c 4 | awk '!/IPV4/{ if ( $2 != "" ) print $2}'
+      register: web1_info
+
+    # - name: Register the hosts in the inventory
+    #   add_host:
+    #     name: web1
+    #     hostname: "{{ item }}"
+    #   with_items:
+    #     - "{{ web1_info.stdout_lines }}"
+
+    - name: install webserver in container
+      become: yes
+      become_user: vagrant
+      shell: lxc exec web1 -- apt install -y nginx
+
+    - name: expose port for webserver in container
+      become: yes
+      become_user: vagrant
+      shell: lxc config device add web1 webport80 proxy listen=tcp:192.168.56.2:8090 connect=tcp:127.0.0.1:80
+
+    #- debug: var=web1_info.stdout
