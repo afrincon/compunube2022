@@ -1,0 +1,149 @@
+---
+- hosts: all
+  gather_facts: no
+
+  tasks:
+    - name: update cache
+      become: yes
+      become_user: root
+      apt:
+        update_cache: yes
+
+    - name: init lxd
+      become: yes
+      become_user: vagrant
+      command: lxd init --auto
+
+    - name: create a container for web server 1
+      become: yes
+      become_user: vagrant
+      community.general.lxd_container:
+        name: web1
+        ignore_volatile_options: true
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          protocol: simplestreams
+          alias: ubuntu/focal/amd64
+        profiles: ["default"]
+        wait_for_ipv4_addresses: true
+        timeout: 600
+
+    - name: install webserver in container
+      become: yes
+      become_user: vagrant
+      shell: lxc exec web1 -- apt install -y apache2
+
+    - name: clone container web1 to web2
+      become: yes
+      become_user: vagrant
+      shell: lxc copy local:web1 local:web2
+
+    - name: start a web2 container
+      community.general.lxd_container:
+        name: web2
+        ignore_volatile_options: false
+        state: started
+        type: container
+
+    - name: create a index html file to web
+      ansible.builtin.lineinfile:
+        path: /home/vagrant/index-web{{ item }}.html
+        line: response from node {{ item }}
+        create: yes
+      with_items: 
+        - 1
+        - 2
+      
+    - name: copy files to containers
+      become: yes
+      become_user: vagrant
+      shell: lxc file push /home/vagrant/index-web{{item}}.html web{{item}}/var/www/html/index.html
+      with_items: 
+        - 1
+        - 2
+
+    - name: Restart a containers
+      community.general.lxd_container:
+        name: web{{item}}
+        ignore_volatile_options: false
+        state: restarted
+        type: container
+      with_items:
+        - 1
+        - 2
+
+    - name: create a container for haproxy
+      become: yes
+      become_user: vagrant
+      community.general.lxd_container:
+        name: haproxy
+        ignore_volatile_options: true
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          protocol: simplestreams
+          alias: ubuntu/focal/amd64
+        profiles: ["default"]
+        wait_for_ipv4_addresses: true
+        timeout: 600
+
+    - name: install haproxy in container
+      become: yes
+      become_user: vagrant
+      shell: lxc exec haproxy -- apt install -y haproxy
+
+    - name: get config of haproxy
+      become: yes
+      become_user: vagrant
+      shell: lxc file pull haproxy/etc/haproxy/haproxy.cfg /home/vagrant/haproxy.cfg
+
+    - name: Get containers IP's
+      become: yes
+      become_user: vagrant
+      shell: lxc list web{{item}} -c 4 | awk '!/IPV4/{ if ( $2 != "" ) print $2}'
+      register: containers_info
+      with_items: 
+        - 1
+        - 2
+
+    - name: create a index html file to web
+      blockinfile:
+        path: /home/vagrant/haproxy.cfg
+        block: |
+
+          backend web-backend
+            balance roundrobin
+            stats enable
+            stats auth admin:admin
+            stats uri /haproxy?stats
+
+            server web1 {{item[0].stdout}}:80 check
+            server web2 {{item[1].stdout}}:80 check
+
+          frontend http
+            bind *:80
+            default_backend web-backend
+
+      loop:
+        - "{{ containers_info.results }}"
+
+    - name: copy config to haproxy container
+      become: yes
+      shell: lxc file push /home/vagrant/haproxy.cfg haproxy/etc/haproxy/haproxy.cfg
+
+    - name: copy config to haproxy container
+      become: yes
+      become_user: vagrant
+      shell: lxc exec haproxy -- systemctl restart haproxy
+
+    - name: expose http port of haproxy
+      become: yes
+      become_user: vagrant
+      shell: lxc config device add haproxy http proxy listen=tcp:0.0.0.0:80 connect=tcp:127.0.0.1:80
+      
+    #- debug: var=containers_info.results

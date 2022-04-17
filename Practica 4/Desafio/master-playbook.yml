@@ -1,0 +1,75 @@
+---
+- hosts: all
+  gather_facts: no
+
+  tasks:
+    - name: update cache
+      become: yes
+      become_user: root
+      apt:
+        update_cache: yes
+
+- hosts: webserver
+  gather_facts: no
+
+  tasks:
+    - name: install apache2
+      become: yes
+      apt:
+        name: apache2
+        state: present
+
+- hosts: node1
+  gather_facts: no
+
+  tasks:
+    - name: create a index html file to web
+      become: yes
+      copy: 
+        content: 'response from node 1' 
+        dest: /var/www/html/index.html
+      
+- hosts: node2
+  gather_facts: no
+
+  tasks:
+    - name: create a index html file to web
+      become: yes
+      copy: 
+        content: 'response from node 2' 
+        dest: /var/www/html/index.html
+
+- hosts: loadbalancer
+  gather_facts: no
+
+  tasks:
+    - name: install haproxy
+      become: yes
+      apt:
+        name: haproxy
+        state: present
+
+    - name: configure haproxy
+      become: yes
+      blockinfile:
+        path: /etc/haproxy/haproxy.cfg
+        block: |
+          backend web-backend
+            balance roundrobin
+            stats enable
+            stats auth admin:admin
+            stats uri /haproxy?stats
+
+            server web1-vm 192.168.56.3:80 check
+            server web2-vm 192.168.56.4:80 check
+
+          frontend http
+            bind *:80
+            default_backend web-backend
+
+    - name: Restart service haproxy
+      become: yes
+      ansible.builtin.systemd:
+        state: restarted
+        daemon_reload: yes
+        name: haproxy
