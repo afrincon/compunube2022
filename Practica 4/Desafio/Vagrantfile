@@ -12,7 +12,7 @@ sudo apt install ansible -y
 ANSIBLE
 
 $deploy_sshpass = <<-SSHPASS
-apt install sshpass
+sudo apt install sshpass -y
 SSHPASS
 
 $install_keys = <<-KEYSPERMISSIONS

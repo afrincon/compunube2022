@@ -6,3 +6,4 @@
 .vagrant
 tensorflow/
 .ipynb_checkpoints
+.vscode

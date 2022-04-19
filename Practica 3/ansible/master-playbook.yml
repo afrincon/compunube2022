@@ -46,6 +46,8 @@
       command: "/home/vagrant/.local/bin/jupyter notebook list"
       register: out
 
+    - debug: var=out
+
     - name: init lxd
       become: yes
       become_user: vagrant
