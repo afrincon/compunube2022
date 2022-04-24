@@ -1,0 +1,196 @@
+---
+- hosts: local
+  gather_facts: no
+
+  vars:
+    ssh_key_filename: id_rsa_microproyecto1
+
+  tasks:
+    - name: Change config of ansible to disable Host key verification
+      become: yes
+      blockinfile:
+        path: /etc/ansible/ansible.cfg
+        block: |
+          [defaults]
+          host_key_checking = no
+
+    - name: Install module Manage LXD instances
+      shell: ansible-galaxy collection install community.general
+
+- hosts: manager
+  gather_facts: no
+
+  tasks:
+    - name: Initialize lxd
+      shell: cat /vagrant/cluster-config/manager-preseed.yml | lxd init --preseed
+
+- hosts: node1
+  gather_facts: no
+
+  tasks:
+    - name: Create Web Server 1
+      community.general.lxd_container:
+        name: web-server-a
+        ignore_volatile_options: true
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          protocol: simplestreams
+          alias: ubuntu/focal/amd64
+        profiles: ["default"]
+        wait_for_ipv4_addresses: true
+        target: node1
+    
+    - name: Create Web Server 1 backup
+      community.general.lxd_container:
+        name: web-server-c
+        ignore_volatile_options: true
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          protocol: simplestreams
+          alias: ubuntu/focal/amd64
+        profiles: ["default"]
+        wait_for_ipv4_addresses: true
+        target: node1
+    - name: Install Web Server with NGINX
+      shell: lxc exec web-server-{{item}} -- apt install nginx -y
+      with_items: [a,c]
+
+    - name: Limit memory usage of containers
+      shell: lxc config set web-server-{{item}} limits.memory 64MB
+      with_items: [a,c]
+
+- hosts: node2
+  gather_facts: no
+
+  tasks:
+    - name: Create Web Server 2
+      community.general.lxd_container:
+        name: web-server-b
+        ignore_volatile_options: true
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          protocol: simplestreams
+          alias: ubuntu/focal/amd64
+        profiles: ["default"]
+        wait_for_ipv4_addresses: true
+        target: node2
+    
+    - name: Create Web Server 2 Backup
+      community.general.lxd_container:
+        name: web-server-d
+        ignore_volatile_options: true
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          protocol: simplestreams
+          alias: ubuntu/focal/amd64
+        profiles: ["default"]
+        wait_for_ipv4_addresses: true
+        target: node2
+
+    - name: Install Web Server with NGINX
+      shell: lxc exec web-server-{{item}} -- apt install nginx -y
+      with_items: [b,d]
+
+    - name: Limit memory usage of containers
+      shell: lxc config set web-server-{{item}} limits.memory 64MB
+      with_items: [b,d]
+      
+- hosts: loadbalancer
+  gather_facts: no
+
+  tasks:
+    - name: create a container for haproxy
+      become: yes
+      become_user: vagrant
+      community.general.lxd_container:
+        name: haproxy
+        ignore_volatile_options: true
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          protocol: simplestreams
+          alias: ubuntu/focal/amd64
+        profiles: ["default"]
+        wait_for_ipv4_addresses: true
+        target: manager
+
+    - name: install haproxy in container
+      become: yes
+      become_user: vagrant
+      shell: lxc exec haproxy -- apt install -y haproxy
+
+    - name: get config of haproxy
+      become: yes
+      become_user: vagrant
+      shell: lxc file pull haproxy/etc/haproxy/haproxy.cfg /home/vagrant/haproxy.cfg
+
+    - name: Get containers IP's
+      become: yes
+      become_user: vagrant
+      shell: lxc list web-server-{{item}} -c 4 | awk '!/IPV4/{ if ( $2 != "" ) print $2}'
+      register: containers_info
+      with_items: [a, b, c , d]
+
+    #- debug: var=containers_info.results
+
+    - name: create a index html file to web
+      blockinfile:
+        path: /home/vagrant/haproxy.cfg
+        block: |
+
+          backend web-backend
+            mode http
+            balance roundrobin
+            stats enable
+            stats auth admin:admin
+            stats hide-version
+            stats uri /haproxy?stats
+
+            server s1 {{item[0].stdout}}:80 check
+            server s2 {{item[1].stdout}}:80 check
+
+          backend web-backend-alt
+            mode http
+            server s3 {{item[2].stdout}}:80 check
+            server s4 {{item[3].stdout}}:80 check
+          
+          frontend http
+            bind *:80
+
+            acl is-web-backend-dead nbsrv(web-backend) eq 0
+            use_backend web-backend-alt if is-web-backend-dead
+            default_backend web-backend
+
+            
+
+      loop:
+        - "{{ containers_info.results }}"
+
+    - name: copy config to haproxy container
+      become: yes
+      shell: lxc file push /home/vagrant/haproxy.cfg haproxy/etc/haproxy/haproxy.cfg
+
+    - name: restart service haproxy container
+      become: yes
+      become_user: vagrant
+      shell: lxc exec haproxy -- systemctl restart haproxy
+
+    - name: expose http port of haproxy
+      become: yes
+      become_user: vagrant
+      shell: lxc config device add haproxy http proxy listen=tcp:0.0.0.0:80 connect=tcp:127.0.0.1:80
+      
