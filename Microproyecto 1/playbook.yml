@@ -1,9 +1,10 @@
 ---
 - hosts: local
-  gather_facts: no
+  gather_facts: yes
 
   vars:
     ssh_key_filename: id_rsa_microproyecto1
+    token: ""
 
   tasks:
     - name: Change config of ansible to disable Host key verification
@@ -18,57 +19,110 @@
       shell: ansible-galaxy collection install community.general
 
 - hosts: manager
-  gather_facts: no
+  gather_facts: yes
 
   tasks:
     - name: Initialize lxd
       shell: cat /vagrant/cluster-config/manager-preseed.yml | lxd init --preseed
 
+    - name: copy cluster certificate
+      copy:
+        src: /var/snap/lxd/common/lxd/cluster.crt
+        dest: /vagrant/cluster-config/cluster.crt
+   
 - hosts: node1
-  gather_facts: no
+  gather_facts: yes
 
   tasks:
-    - name: Create Web Server 1
-      community.general.lxd_container:
-        name: web-server-a
-        ignore_volatile_options: true
-        state: started
-        source:
-          type: image
-          mode: pull
-          server: https://images.linuxcontainers.org
-          protocol: simplestreams
-          alias: ubuntu/focal/amd64
-        profiles: ["default"]
-        wait_for_ipv4_addresses: true
-        target: node1
-    
-    - name: Create Web Server 1 backup
-      community.general.lxd_container:
-        name: web-server-c
-        ignore_volatile_options: true
-        state: started
-        source:
-          type: image
-          mode: pull
-          server: https://images.linuxcontainers.org
-          protocol: simplestreams
-          alias: ubuntu/focal/amd64
-        profiles: ["default"]
-        wait_for_ipv4_addresses: true
-        target: node1
-    - name: Install Web Server with NGINX
-      shell: lxc exec web-server-{{item}} -- apt install nginx -y
-      with_items: [a,c]
 
-    - name: Limit memory usage of containers
-      shell: lxc config set web-server-{{item}} limits.memory 64MB
-      with_items: [a,c]
+      - name: copy preseed to modify
+        copy:
+          src: /vagrant/cluster-config/node1-preseed.yml
+          dest: /home/vagrant/preseed.yml
+
+      - name: copy cert to manipulate
+        copy: 
+          src: /vagrant/cluster-config/cluster.crt
+          dest: /home/vagrant/key.pem
+
+      - name: change cert values an insert into preseed
+        shell: |
+          sed -i '1d' key.pem
+          sed ':a;N;$!ba;s/\n/\n\n/g' key.pem >> preseed.yml
+          echo '"' >> preseed.yml
+          
+      - name: join node 1 to cluster
+        become: yes
+        become_user: vagrant
+        shell: cat preseed.yml | lxd init --preseed
+      
+      - name: Create Web Server 1
+        community.general.lxd_container:
+          name: web-server-a
+          ignore_volatile_options: true
+          state: started
+          source:
+            type: image
+            mode: pull
+            server: https://images.linuxcontainers.org
+            protocol: simplestreams
+            alias: ubuntu/focal/amd64
+          profiles: ["default"]
+          wait_for_ipv4_addresses: true
+          target: node1
+      
+      - name: Create Web Server 1 backup
+        community.general.lxd_container:
+          name: web-server-c
+          ignore_volatile_options: true
+          state: started
+          source:
+            type: image
+            mode: pull
+            server: https://images.linuxcontainers.org
+            protocol: simplestreams
+            alias: ubuntu/focal/amd64
+          profiles: ["default"]
+          wait_for_ipv4_addresses: true
+          target: node1
+      - name: Install Web Server with NGINX
+        shell: lxc exec web-server-{{item}} -- apt install nginx -y
+        with_items: [a,c]
+
+      - name: Limit memory usage of containers
+        shell: lxc config set web-server-{{item}} limits.memory 64MB
+        with_items: [a,c]
 
 - hosts: node2
-  gather_facts: no
+  gather_facts: yes
 
   tasks:
+    - name: copy preseed to modify
+      copy:
+        src: /vagrant/cluster-config/node2-preseed.yml
+        dest: /home/vagrant/preseed.yml
+
+    - name: copy cert to manipulate
+      copy: 
+        src: /vagrant/cluster-config/cluster.crt
+        dest: /home/vagrant/key.pem
+
+    - name: change cert values an insert into preseed
+      shell: |
+        sed -i '1d' key.pem
+        sed ':a;N;$!ba;s/\n/\n\n/g' key.pem >> preseed.yml
+        echo '"' >> preseed.yml
+          
+    - name: join node 2 to cluster
+      become: yes
+      become_user: vagrant
+      shell: cat preseed.yml | lxd init --preseed
+
+    - name: delete cert
+      file:
+        path: /vagrant/cluster-config/cluster.crt
+        state: absent
+
     - name: Create Web Server 2
       community.general.lxd_container:
         name: web-server-b
@@ -108,7 +162,7 @@
       with_items: [b,d]
       
 - hosts: loadbalancer
-  gather_facts: no
+  gather_facts: yes
 
   tasks:
     - name: create a container for haproxy

@@ -1,7 +1,7 @@
 cluster:
   enabled: true
-  server_name: node1
-  server_address: 192.168.56.3:8443
+  server_name: node2
+  server_address: 192.168.56.4:8443
   member_config:
   - entity: storage-pool
     name: local
