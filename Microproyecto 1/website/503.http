@@ -1,0 +1,52 @@
+HTTP/1.0 503 Service Unavailable
+Cache-Control: no-cache
+Connection: close
+Content-Type: text/html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div class="relative row-start-1 col-start-1 col-span-5 xl:col-span-6 -mt-10">
+    <div class="h-[24.25rem] max-w-xl mx-auto lg:max-w-none flex items-center justify-center">
+    <div class="w-full flex-none">
+    <div class="lg:-mr-18">
+    <div class="relative z-10 rounded-lg shadow-xl 
+    text-slate-900 mx-auto sm:w-[23.4375rem] dark:text-slate-300"
+    style="transform-origin: 50% 50% 0px; width: 1024px;">
+    <div class="bg-white rounded-lg overflow-hidden 
+            ring-1 ring-slate-900/5 dark:bg-slate-800 
+            dark:highlight-white/5 dark:ring-0 p-8"
+            style="transform-origin: 50% 50% 0px;">
+        <figure class="md:flex bg-slate-100 rounded-xl p-8 md:p-0 dark:bg-slate-800">
+            <img class="w-24 h-24 md:w-96 md:h-auto md:rounded-none rounded-full mx-auto" src="https://www.ionos.es/digitalguide/fileadmin/DigitalGuide/Teaser/status_503-t.jpg" alt="" width="384" height="512">
+            <div class="pt-6 md:p-8 text-center md:text-left space-y-4">
+                <blockquote>
+                <p class="text-lg font-medium">
+                    “Se ha producido un error de disponibilidad en los equipos, por favor intente nuevamente.”
+                </p>
+                </blockquote>
+                <figcaption class="font-medium">
+                <div class="text-sky-500 dark:text-sky-400">
+                    Site admin
+                </div>
+                <div class="text-slate-700 dark:text-slate-500">
+                    Staff Engineer, CN2022
+                </div>
+                </figcaption>
+            </div>
+        </figure>
+    </div>
+    </div>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
