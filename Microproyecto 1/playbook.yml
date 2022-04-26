@@ -56,9 +56,9 @@
         become_user: vagrant
         shell: cat preseed.yml | lxd init --preseed
       
-      - name: Create Web Server 1
+      - name: Create Web Server {{item}}
         community.general.lxd_container:
-          name: web-server-a
+          name: u{{item}}
           ignore_volatile_options: true
           state: started
           source:
@@ -70,28 +70,15 @@
           profiles: ["default"]
           wait_for_ipv4_addresses: true
           target: node1
+        with_items: [1,3,5]
       
-      - name: Create Web Server 1 backup
-        community.general.lxd_container:
-          name: web-server-c
-          ignore_volatile_options: true
-          state: started
-          source:
-            type: image
-            mode: pull
-            server: https://images.linuxcontainers.org
-            protocol: simplestreams
-            alias: ubuntu/focal/amd64
-          profiles: ["default"]
-          wait_for_ipv4_addresses: true
-          target: node1
       - name: Install Web Server with NGINX
-        shell: lxc exec web-server-{{item}} -- apt install nginx -y
-        with_items: [a,c]
+        shell: lxc exec u{{item}} -- apt install nginx -y
+        with_items: [1,3,5]
 
       - name: Limit memory usage of containers
-        shell: lxc config set web-server-{{item}} limits.memory 64MB
-        with_items: [a,c]
+        shell: lxc config set u{{item}} limits.memory 64MB
+        with_items: [1,3,5]
 
 - hosts: node2
   gather_facts: yes
@@ -123,9 +110,9 @@
         path: /vagrant/cluster-config/cluster.crt
         state: absent
 
-    - name: Create Web Server 2
+    - name: Create Web Server {{item}}
       community.general.lxd_container:
-        name: web-server-b
+        name: u{{item}}
         ignore_volatile_options: true
         state: started
         source:
@@ -137,29 +124,15 @@
         profiles: ["default"]
         wait_for_ipv4_addresses: true
         target: node2
-    
-    - name: Create Web Server 2 Backup
-      community.general.lxd_container:
-        name: web-server-d
-        ignore_volatile_options: true
-        state: started
-        source:
-          type: image
-          mode: pull
-          server: https://images.linuxcontainers.org
-          protocol: simplestreams
-          alias: ubuntu/focal/amd64
-        profiles: ["default"]
-        wait_for_ipv4_addresses: true
-        target: node2
+      with_items: [2,4,6]
 
     - name: Install Web Server with NGINX
-      shell: lxc exec web-server-{{item}} -- apt install nginx -y
-      with_items: [b,d]
+      shell: lxc exec u{{item}} -- apt install nginx -y
+      with_items: [2,4,6]
 
     - name: Limit memory usage of containers
-      shell: lxc config set web-server-{{item}} limits.memory 64MB
-      with_items: [b,d]
+      shell: lxc config set u{{item}} limits.memory 64MB
+      with_items: [2,4,6]
       
 - hosts: loadbalancer
   gather_facts: yes
@@ -169,7 +142,7 @@
       become: yes
       become_user: vagrant
       community.general.lxd_container:
-        name: haproxy
+        name: lb
         ignore_volatile_options: true
         state: started
         source:
@@ -185,19 +158,19 @@
     - name: install haproxy in container
       become: yes
       become_user: vagrant
-      shell: lxc exec haproxy -- apt install -y haproxy
+      shell: lxc exec lb -- apt install -y haproxy
 
     - name: get config of haproxy
       become: yes
       become_user: vagrant
-      shell: lxc file pull haproxy/etc/haproxy/haproxy.cfg /home/vagrant/haproxy.cfg
+      shell: lxc file pull lb/etc/haproxy/haproxy.cfg /home/vagrant/haproxy.cfg
 
     - name: Get containers IP's
       become: yes
       become_user: vagrant
-      shell: lxc list web-server-{{item}} -c 4 | awk '!/IPV4/{ if ( $2 != "" ) print $2}'
+      shell: lxc list u{{item}} -c 4 | awk '!/IPV4/{ if ( $2 != "" ) print $2}'
       register: containers_info
-      with_items: [a, b, c , d]
+      with_items: [1,2,3,4,5,6]
 
     #- debug: var=containers_info.results
 
@@ -214,37 +187,58 @@
             stats hide-version
             stats uri /haproxy?stats
 
-            server s1 {{item[0].stdout}}:80 check
-            server s2 {{item[1].stdout}}:80 check
+            server u1 {{item[0].stdout}}:80 check maxconn 100
+            server u2 {{item[1].stdout}}:80 check maxconn 100
+            option allbackups
+            server u3 {{item[2].stdout}}:80 check backup
+            server u4 {{item[3].stdout}}:80 check backup
 
           backend web-backend-alt
             mode http
-            server s3 {{item[2].stdout}}:80 check
-            server s4 {{item[3].stdout}}:80 check
+            server u5 {{item[4].stdout}}:80 check maxconn 100
+            server u6 {{item[5].stdout}}:80 check backup
           
           frontend http
             bind *:80
+            stats enable
+            stats auth admin:admin
+            stats hide-version
+            stats uri /haproxy?stats
 
             acl is-web-backend-dead nbsrv(web-backend) eq 0
             use_backend web-backend-alt if is-web-backend-dead
             default_backend web-backend
-
-            
 
       loop:
         - "{{ containers_info.results }}"
 
     - name: copy config to haproxy container
       become: yes
-      shell: lxc file push /home/vagrant/haproxy.cfg haproxy/etc/haproxy/haproxy.cfg
+      shell: lxc file push /home/vagrant/haproxy.cfg lb/etc/haproxy/haproxy.cfg
+
+    - name: Upload custom 503 error template
+      become: yes
+      shell: lxc file push /vagrant/website/503.http lb/etc/haproxy/errors/503.http
 
     - name: restart service haproxy container
       become: yes
       become_user: vagrant
-      shell: lxc exec haproxy -- systemctl restart haproxy
+      shell: lxc exec lb -- systemctl restart haproxy
 
     - name: expose http port of haproxy
       become: yes
       become_user: vagrant
-      shell: lxc config device add haproxy http proxy listen=tcp:0.0.0.0:80 connect=tcp:127.0.0.1:80
-      
+      shell: lxc config device add lb http proxy listen=tcp:0.0.0.0:80 connect=tcp:127.0.0.1:80
+
+    - name: push html file
+      become: yes
+      shell: lxc file push /vagrant/website/index.html u{{item}}/var/www/html/index.html
+      with_items: [1,2,3,4,5,6]
+
+    - name: change text on html for response
+      become: yes
+      shell: lxc exec u{{item}} -- sed -i 's/u1/u{{item}}/g' /var/www/html/index.html 
+      with_items: [2,3,4,5,6]
+
+    
+
