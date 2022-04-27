@@ -24,21 +24,21 @@
         name: sshpass
         state: present
 
-    # - name: generate ssh keys "{{ssh_key_filename}}"
-    #   openssh_keypair:
-    #     path: "~/.ssh/{{ssh_key_filename}}"
-    #     type: rsa
-    #     size: 4096
-    #     state: present
-    #     force: no
+    - name: generate ssh keys "{{ssh_key_filename}}"
+      openssh_keypair:
+        path: "~/.ssh/{{ssh_key_filename}}"
+        type: rsa
+        size: 4096
+        state: present
+        force: no
     
-    # - name: copy keys
-    #   shell: |
-    #     chmod 600 /home/vagrant/.ssh/{{ssh_key_filename}}
-    #     chmod 600 /home/vagrant/.ssh/{{ssh_key_filename}}.pub
-    #     sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{{ssh_key_filename}} -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" vagrant@192.168.56.2
-    #     sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{{ssh_key_filename}} -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" vagrant@192.168.56.3 
-    #     sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{{ssh_key_filename}} -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" vagrant@192.168.56.4 
+    - name: copy keys
+      shell: |
+        chmod 600 /home/vagrant/.ssh/{{ssh_key_filename}}
+        chmod 600 /home/vagrant/.ssh/{{ssh_key_filename}}.pub
+        sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{{ssh_key_filename}} -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" vagrant@192.168.56.2
+        sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{{ssh_key_filename}} -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" vagrant@192.168.56.3 
+        sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{{ssh_key_filename}} -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" vagrant@192.168.56.4 
       
 - hosts: manager
   gather_facts: yes
