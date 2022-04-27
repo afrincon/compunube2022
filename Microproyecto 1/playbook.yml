@@ -4,8 +4,7 @@
 
   vars:
     ssh_key_filename: id_rsa_microproyecto1
-    token: ""
-
+    
   tasks:
     - name: Change config of ansible to disable Host key verification
       become: yes
@@ -94,8 +93,8 @@
           target: node1
         with_items: [1,3,5]
       
-      - name: Install Web Server with NGINX
-        shell: lxc exec u{{item}} -- apt install nginx -y
+      - name: Install Web Server with apache
+        shell: lxc exec u{{item}} -- apt install apache2 -y
         with_items: [1,3,5]
 
       - name: Limit memory usage of containers
@@ -148,8 +147,8 @@
         target: node2
       with_items: [2,4,6]
 
-    - name: Install Web Server with NGINX
-      shell: lxc exec u{{item}} -- apt install nginx -y
+    - name: Install Web Server with apache
+      shell: lxc exec u{{item}} -- apt install apache2 -y
       with_items: [2,4,6]
 
     - name: Limit memory usage of containers
