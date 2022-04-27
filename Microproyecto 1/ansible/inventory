@@ -2,11 +2,11 @@
 localhost ansible_connection=local
 
 [loadbalancer]
-manager ansible_host=192.168.56.2 ansible_user='vagrant' ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa
+manager ansible_host=192.168.56.2 ansible_user='vagrant' ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa_microproyecto1
 
 [webserver]
-node1   ansible_host=192.168.56.3 ansible_user='vagrant' ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa
-node2   ansible_host=192.168.56.4 ansible_user='vagrant' ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa
+node1   ansible_host=192.168.56.3 ansible_user='vagrant' ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa_microproyecto1
+node2   ansible_host=192.168.56.4 ansible_user='vagrant' ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa_microproyecto1
 
 [cluster]
 node[1:2]
