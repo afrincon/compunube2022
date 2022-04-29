@@ -202,14 +202,14 @@
 
           backend web-backend
             mode http
-            balance roundrobin
+            balance leastconn
             stats enable
             stats auth admin:admin
             stats hide-version
             stats uri /haproxy?stats
 
-            server u1 {{item[0].stdout}}:80 check maxconn 100
-            server u2 {{item[1].stdout}}:80 check maxconn 100
+            server u1 {{item[0].stdout}}:80 check
+            server u2 {{item[1].stdout}}:80 check
             option allbackups
             server u3 {{item[2].stdout}}:80 check backup
             server u4 {{item[3].stdout}}:80 check backup
