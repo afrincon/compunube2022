@@ -1,0 +1,158 @@
+---
+- hosts: all
+  gather_facts: yes
+  become: true
+
+  vars:
+    default_container_name: docker
+    default_container_image: jupyter/minimal-notebook
+    default_container_command: sleep 1
+
+  tasks:
+    - name: Update cache
+      apt:
+        update_cache: yes
+
+    - name: Remove Older versions of Docker
+      apt:
+        name: |
+          docker
+          docker-engine
+          docker.io
+          containerd
+          runc
+        state: absent
+
+    - name: Install required system packages
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+          - gnupg 
+          - lsb-release
+        state: latest
+        update_cache: true
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: true
+
+    - name: Install Docker Module for Python
+      pip:
+        name: docker
+  
+    - name: Pull default Docker image
+      community.docker.docker_image:
+        name: "{{ default_container_image }}"
+        source: pull
+
+    - name: create build directory
+      file:
+        path: /root/datascience
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: copy Dockerfile
+      copy:
+        src: ./Dockerfile
+        dest: /root/datascience/Dockerfile
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Build image
+      community.docker.docker_image:
+        name: data-science-ia
+        build:
+          path: /root/datascience
+        source: build
+
+    - name: run container with volume attached
+      community.docker.docker_container:
+        name: ia-cn2022
+        image: data-science-ia
+        state: started
+        detach: true
+        volumes:
+          - ./notebooks:/notebooks
+
+    - name: Get jupyter Notebook address
+      shell: docker logs ia-cn2022
+      register: docker_container_output
+
+    - name: Show test output
+      debug:
+        msg: "{{ docker_container_output }}"
+
+    - name: Initializer lxd "Desafio"
+      become_user: vagrant
+      shell: lxd init --auto
+
+    - name: Create storage pool btrfs "Desafio"
+      become_user: vagrant
+      shell: lxc storage create spdocker btrfs
+
+    - name: create a container for web server "Desafio"
+      become_user: vagrant
+      community.general.lxd_container:
+        name: web
+        ignore_volatile_options: true
+        state: started
+        source:
+          type: image
+          mode: pull
+          server: https://images.linuxcontainers.org
+          protocol: simplestreams
+          alias: ubuntu/focal/amd64
+        profiles: ["default"]
+        wait_for_ipv4_addresses: true
+        timeout: 600
+
+    - name: Create strorage pool "Desafio"
+      become_user: vagrant
+      shell: lxc storage volume create spdocker web
+
+    - name: Attach container to storage pool "Desafio"
+      become_user: vagrant
+      shell: lxc config device add web spdocker disk pool=spdocker source=web path=/var/lib/docker
+
+    - name: Add configuration to run docker
+      become_user: vagrant
+      shell: lxc config set web security.nesting=true security.syscalls.intercept.mknod=true security.syscalls.intercept.setxattr=true
+
+    - name: restart lxd container instance
+      become_user: vagrant
+      shell: lxc restart web
+
+    - name: update cache in container
+      become_user: vagrant
+      shell: lxc exec web -- apt-get update -y 
+
+    - name: install required packages
+      become_user: vagrant
+      shell: lxc exec web -- apt-get install \
+          ca-certificates \
+          curl \
+          gnupg \
+            lsb-release -y
+
+        
