@@ -51,9 +51,8 @@
         name: docker
 
     - name: Install docker compose plugin
-      apt: 
-        name: docker-compose-plugin
-        state: latest 
+      pip:
+        name: docker-compose
     
     - name: Add user to docker group
       become_user: vagrant
@@ -64,7 +63,7 @@
 
     - name: run compose
       community.docker.docker_compose:
-        project_src: /vagrant/docker-compose.yml
+        project_src: /vagrant
 
 
 
