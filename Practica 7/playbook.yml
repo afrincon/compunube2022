@@ -1,0 +1,89 @@
+---
+- hosts: all
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Update cache
+      apt:
+        update_cache: yes
+
+    - name: Remove Older versions of Docker were called docker, docker.io, or docker-engine.
+      apt: 
+        pkg:
+          - docker
+          - docker-engine
+          - docker.io
+          - containerd
+          - runc
+        state: absent
+    
+    - name: Install packages to allow apt to use a repository over HTTPS
+      apt:
+        pkg:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+          - apt-transport-https
+        state: present
+    
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: true
+    
+    - name: Install Docker Module for Python
+      pip:
+        name: docker
+
+    - name: Install docker compose plugin
+      pip:
+        name: docker-compose
+    
+    - name: Add user to docker group
+      become_user: vagrant
+      shell: sudo usermod -aG docker $USER
+
+    - name: Install ansible support for docker
+      shell: ansible-galaxy collection install community.general
+
+    - name: Download minikube
+      become_user: vagrant
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        dest: /home/vagrant/minikube-linux-amd64
+        mode: '0755'
+
+    - name: Install minikube
+      shell: install /home/vagrant/minikube-linux-amd64 /usr/local/bin/minikube
+
+    - name: Download kubeCtl
+      become_user: vagrant
+      shell: curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    
+    - name: Install kubectl
+      shell: sudo install -o root -g root -m 0755 /vagrant/kubectl /usr/local/bin/kubectl
+
+    - name: remove files from /vagrant
+      ansible.builtin.file:
+        path: /vagrant/kubectl
+        state: absent
+
+    - name: Cluster init
+      become_user: vagrant
+      shell: minikube start
