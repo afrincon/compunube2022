@@ -1,0 +1,115 @@
+---
+- hosts: local
+  gather_facts: true
+
+  vars:
+    ssh_key_filename: id_rsa_practica6a
+    
+  tasks:
+    - name: Change config of ansible to disable Host key verification
+      become: true
+      blockinfile:
+        path: /etc/ansible/ansible.cfg
+        block: |
+          [defaults]
+          host_key_checking = no
+
+    - name: Install module Manage docker instances
+      shell: |
+        ansible-galaxy collection install community.general
+
+    - name: Install sshpass
+      become: true
+      apt:
+        name: sshpass
+        state: present
+
+    - name: generate ssh keys "{{ssh_key_filename}}"
+      openssh_keypair:
+        path: "~/.ssh/{{ssh_key_filename}}"
+        type: rsa
+        size: 4096
+        state: present
+        force: no
+    
+    - name: copy keys
+      shell: |
+        chmod 600 /home/vagrant/.ssh/{{ssh_key_filename}}
+        chmod 600 /home/vagrant/.ssh/{{ssh_key_filename}}.pub
+        sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{{ssh_key_filename}} -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" vagrant@192.168.56.5
+        sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{{ssh_key_filename}} -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" vagrant@192.168.56.3 
+        sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/{{ssh_key_filename}} -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" vagrant@192.168.56.4 
+      
+
+- hosts: swarm
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Update cache
+      apt:
+        update_cache: yes
+
+    - name: Remove Older versions of Docker were called docker, docker.io, or docker-engine.
+      apt: 
+        pkg:
+          - docker
+          - docker-engine
+          - docker.io
+          - containerd
+          - runc
+        state: absent
+    
+    - name: Install packages to allow apt to use a repository over HTTPS
+      apt:
+        pkg:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+        state: present
+    
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: true
+    
+    - name: Install Docker Module for Python
+      pip:
+        name: docker
+
+- hosts: manager
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Init a new swarm with default parameters
+      community.docker.docker_swarm:
+        state: present
+        advertise_addr: 192.168.56.5
+      register: output
+
+    - name: Add nodes
+      community.docker.docker_swarm:
+        state: join
+        advertise_addr: 192.168.56.3
+        join_token: {{ output.swarm_facts.JoinTokens.Worker }}
+        remote_addrs: [ '192.168.56.5:2377' ]
+      with_sequence:
+        - output
+
+    - debug: var=output.swarm_facts.JoinTokens.Worker
