@@ -1,0 +1,78 @@
+# Install docker
+sudo apt-get update
+ sudo apt-get install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io -y
+
+sudo usermod -aG docker $USER
+
+vagrant reload
+
+sudo apt-get update
+sudo apt-get install ca-certificates curl apt-transport-https lsb-release gnupg -y 
+
+curl -sL https://packages.microsoft.com/keys/microsoft.asc |
+    gpg --dearmor |
+    sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+
+AZ_REPO=$(lsb_release -cs)
+echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" |
+    sudo tee /etc/apt/sources.list.d/azure-cli.list
+
+sudo apt-get update
+sudo apt-get install azure-cli
+
+cd /vagrant/app
+docker build -t punto2 .
+
+#Login in azure
+az login
+
+# Create resource group|
+az group create --name microproyecto-2 --location australiaeast
+
+#create container registry
+az acr create --resource-group microproyecto-2 --name zerocnrg --sku Basic
+
+# create cluster aks
+az aks create -g microproyecto-2 --name clusterCN --node-count 2 --enable-addons monitoring --generate-ssh-keys --attach-acr  zerocnrg
+
+# intall kubectl
+az aks install-cli
+
+# Login to container registry
+az acr login --name zerocnrg
+
+#subir imagen al container registry
+docker tag punto2 zerocnrg.azurecr.io/punto2:v1.0
+docker push zerocnrg.azurecr.io/punto2:v1.0
+
+# obtener credenciales al kubectl
+az aks get-credentials --resource-group microproyecto-2 --name clusterCN
+
+# listar nodos
+kubectl get nodes
+
+# Desplegar app
+kubectl apply -f deployment.yaml 
+
+# listar pods
+kubectl get pods
+
+
+# exponer app
+kubectl expose deployment kubermatic-dl-deployment  --type=LoadBalancer --port 80 --target-port 5000
+
+#obtener servicios
+kubectl get service
