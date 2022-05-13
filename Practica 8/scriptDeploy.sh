@@ -1,6 +1,7 @@
-# Install docker
+# install docker
 sudo apt-get update
- sudo apt-get install -y \
+
+sudo apt-get install -y \
     ca-certificates \
     curl \
     gnupg \
@@ -17,7 +18,14 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io -y
 
 sudo usermod -aG docker $USER
 
-vagrant reload
+# after this run an vagrant reload
+
+RES_GROUP=microproyecto-2
+RES_LOCATION=australiaeast
+ACR_NAME=zeroacrng
+CLUSTER_NAME=clusterCN
+
+# install azure cli
 
 sudo apt-get update
 sudo apt-get install ca-certificates curl apt-transport-https lsb-release gnupg -y 
@@ -33,33 +41,30 @@ echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO 
 sudo apt-get update
 sudo apt-get install azure-cli
 
-cd /vagrant/app
-docker build -t punto2 .
 
-#Login in azure
+# login in azure
 az login
 
 # Create resource group|
-az group create --name microproyecto-2 --location australiaeast
+az group create --name $RES_GROUP --location $RES_LOCATION
 
 #create container registry
-az acr create --resource-group microproyecto-2 --name zerocnrg --sku Basic
+az acr create -g $RES_GROUP --name $ACR_NAME --sku Basic
 
 # create cluster aks
-az aks create -g microproyecto-2 --name clusterCN --node-count 2 --enable-addons monitoring --generate-ssh-keys --attach-acr  zerocnrg
+az aks create -g $RES_GROUP --name $CLUSTER_NAME --node-count 2 --enable-addons monitoring --generate-ssh-keys --attach-acr  $ACR_NAME
 
 # intall kubectl
-az aks install-cli
+sudo az aks install-cli
 
 # Login to container registry
-az acr login --name zerocnrg
+az acr login --name $ACR_NAME
 
-#subir imagen al container registry
-docker tag punto2 zerocnrg.azurecr.io/punto2:v1.0
-docker push zerocnrg.azurecr.io/punto2:v1.0
+cd /vagrant/app
+az acr build --image kubermatic-dl:v1 --registry $ACR_NAME --file Dockerfile .
 
 # obtener credenciales al kubectl
-az aks get-credentials --resource-group microproyecto-2 --name clusterCN
+az aks get-credentials --resource-group $RES_GROUP --name $CLUSTER_NAME
 
 # listar nodos
 kubectl get nodes
@@ -70,9 +75,21 @@ kubectl apply -f deployment.yaml
 # listar pods
 kubectl get pods
 
+# listar deployments
+kubectl get deployments --all-namespaces=true
 
 # exponer app
 kubectl expose deployment kubermatic-dl-deployment  --type=LoadBalancer --port 80 --target-port 5000
 
 #obtener servicios
 kubectl get service
+
+#conexion
+curl -X POST -F img=@horse-galloping-in-grass.jpg http://20.92.194.77/predict
+
+
+
+# voting app
+kubectl apply -f app-vote.yaml
+kubectl get pods
+kubectl get service azure-vote-front --watch
