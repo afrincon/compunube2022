@@ -85,7 +85,7 @@ kubectl expose deployment kubermatic-dl-deployment  --type=LoadBalancer --port 8
 kubectl get service
 
 #conexion
-curl -X POST -F img=@horse-galloping-in-grass.jpg http://20.92.194.77/predict
+curl -X POST -F img=@horse-galloping-in-grass.jpg http://20.92.157.131/predict
 
 
 
@@ -93,3 +93,16 @@ curl -X POST -F img=@horse-galloping-in-grass.jpg http://20.92.194.77/predict
 kubectl apply -f app-vote.yaml
 kubectl get pods
 kubectl get service azure-vote-front --watch
+
+
+# HPA
+# autoscale
+kubectl apply -f https://k8s.io/examples/application/php-apache.yaml
+
+kubectl run -i \
+    --tty load-generator \
+    --rm --image=busybox \
+    --restart=Never \
+    -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://php-apache; done"
+
+kubectl get hpa php-apache
